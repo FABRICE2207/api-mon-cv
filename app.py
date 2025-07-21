@@ -23,7 +23,7 @@ def create_app():
     # Configuration de base
     app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'static','uploads')
     app.config['STATIC_FOLDER'] = os.path.join(os.path.dirname(__file__), 'static')
-    app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
+    app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg'}
     app.config['JWT_DECODE_ALIASES'] = {'sub': None}  # Désactive la vérification du sujet
     JWTManager(app)
     db.init_app(app)
