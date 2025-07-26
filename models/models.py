@@ -23,7 +23,6 @@ def create_admin_user():
     db.session.commit()
     print("Utilisateur admin créé avec succès.")
 
-
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -54,7 +53,6 @@ class Model_cv(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-
 # class Abonnements(db.Model):
 #     __tablename__ = 'abonnements'
 #     id = db.Column(db.Integer, primary_key=True)
@@ -67,7 +65,6 @@ class Model_cv(db.Model):
 #     paiements = db.relationship('Paiements', backref='abonnements', lazy=True)
 #     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 #     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
 
 # class Paiements(db.Model):
 #     __tablename__ = 'paiements'

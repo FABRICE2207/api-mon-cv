@@ -3,7 +3,7 @@
 # 📁 routes.py — API CRUD + Auth
 # ============================
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
-from models import db, Cv
+from models import db, Cv, User
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import json
 from werkzeug.utils import secure_filename
@@ -16,52 +16,6 @@ def allowed_file(filename):
            filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 api = Blueprint('cvs_api', __name__)
-
-# Ajouter un nouveau CV
-# @api.route('/add_new_cv', methods=['POST'])
-# @jwt_required()
-# def add_new_cv():
-#     try:
-#         current_user_id = get_jwt_identity()
-#         data = request.get_json()
-
-#         required_fields = ['models_cv_id', 'users_id', 'cvData']
-
-#         missing_fields = [field for field in required_fields if field not in data or data[field] in [None, ""]]
-#         if missing_fields:
-#             return jsonify({"error": f"Champs manquants : {', '.join(missing_fields)}"}), 400
-
-#         # Conversion du contenu de l'infos du cv
-#         cvData = data['cvData']
-#         if isinstance(cvData, str):
-#             try:
-#                 cvData = json.loads(cvData)
-#             except json.JSONDecodeError:
-#                 return jsonify({"error": "cvDataJSON invalide"}), 400
-
-#         # Création du CV (la conversion JSON est gérée automatiquement par le modèle)
-#         new_cv = Cv(
-#             cvData=data['cvData'],  # Peut être dict ou string JSON
-#             users_id=current_user_id,
-#             models_cv_id=data.get('models_cv_id')
-#         )
-
-#         db.session.add(new_cv)
-#         db.session.commit()
-
-#         return jsonify({
-#             "message": "CV créé avec succès",
-#             "cv_id": new_cv.id,
-#             "cvData": new_cv.cvData,
-#             "users_id": current_user_id
-#         }), 201
-
-#     except ValueError as e:
-#         db.session.rollback()
-#         return jsonify({"error": "Données JSON invalides", "details": str(e)}), 400
-#     except Exception as e:
-#         db.session.rollback()
-#         return jsonify({"error": "Erreur serveur", "details": str(e)}), 500
 
 @api.route('/add_new_cv', methods=['POST'])
 @jwt_required()
@@ -156,8 +110,6 @@ def delete_photo(filename):
     else:
         return jsonify({"error": "Fichier introuvable"}), 404
 
-
-
 # Liste des Cvs
 @api.route('/liste_cvs', methods=['GET'])
 def list_cvs():
@@ -172,14 +124,13 @@ def list_cvs():
         
     } for cv in cvs])
 
-@api.route('/Cvs/<int:id>', methods=['GET'])
-@jwt_required()
-def get_Cv(id):
-    Cv = Cv.query.get_or_404(id)
+@api.route('/get_cv_id/<int:id>', methods=['GET'])
+# @jwt_required()
+def get_cv(id):
+    cv = Cv.query.get_or_404(id)
     return jsonify({
-        "id": Cv.id,
-        "cvData": Cv.Cv,
-        "date_creation": Cv.date_creation.isoformat()
+        "id": cv.id,
+        "cvData": cv.cvData
     })
 
 # Lister les CV d'un utilisateur
@@ -200,7 +151,6 @@ def get_user_Cvs(users_id):
         "created_at": cv.created_at
     } for cv in cvs])
 
-
 # Mise à jour d'un CV
 @api.route('/Cvs/<int:id>', methods=['PUT'])
 @jwt_required()
@@ -213,6 +163,32 @@ def update_Cv(id):
     Cv.cvData = data['cvData']
     db.session.commit()
     return jsonify({"message": "Cv mis à jour"})
+
+
+@api.route('/cv/get_cv_id/<int:id>', methods=['GET'])
+def get_cv_by_id(id):
+    cv = Cv.query.get(id)
+
+    if not cv:
+        return jsonify({"message": "CV introuvable"}), 404
+
+    user = User.query.get(cv.users_id)
+
+    return jsonify({
+        "cv": {
+            "id": cv.id,
+            "users_id": cv.users_id,
+            "models_cv_id": cv.models_cv_id,
+            "cvData": cv.cvData,
+            "created_at": cv.created_at.isoformat(),
+            "updated_at": cv.updated_at.isoformat()
+        },
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email
+        }
+    }), 200
 
 # Supprimer un CV
 @api.route('/Cvs/<int:id>', methods=['DELETE'])
