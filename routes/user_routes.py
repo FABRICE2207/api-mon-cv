@@ -74,7 +74,7 @@ def update_user(id):
 # Liste tous les utilisateurs
 @api.route('/liste_users', methods=['GET'])
 def getAll():
-    datas = User.query.all()
+    datas = User.filter_by(roles="client")
     return jsonify(
         [
         {

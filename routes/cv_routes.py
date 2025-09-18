@@ -152,17 +152,28 @@ def get_user_Cvs(users_id):
     } for cv in cvs])
 
 # Mise à jour d'un CV
-@api.route('/Cvs/<int:id>', methods=['PUT'])
+@api.route('/cvs_update/<int:id>', methods=['PUT'])
 @jwt_required()
 def update_Cv(id):
-    Cv = Cv.query.get_or_404(id)
-    data = request.get_json()
-    if not data or 'titre' not in data or 'cvData' not in data:
-        return jsonify({"error": "Titre ou cvData manquant"}), 400
-    Cv.titre = data['titre']
-    Cv.cvData = data['cvData']
-    db.session.commit()
-    return jsonify({"message": "Cv mis à jour"})
+    cv = Cv.query.get_or_404(id)
+    try:
+        data = request.get_json()
+        print(data)
+        if not data or 'cvData' not in data:
+            return jsonify({"error": "Données JSON invalides ou champ 'cvData' manquant"}), 400
+
+        cv.cvData = data['cvData']
+
+        if 'models_cv_id' in data:
+            cv.models_cv_id = data['models_cv_id']
+        
+        print(data['models_cv_id'])
+        print(data['cvData'])
+        db.session.commit()
+        return jsonify({"message": "Cv mis à jour avec succès"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 
 @api.route('/cv/get_cv_id/<int:id>', methods=['GET'])
