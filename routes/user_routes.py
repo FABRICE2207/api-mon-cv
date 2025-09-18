@@ -74,7 +74,7 @@ def update_user(id):
 # Liste tous les utilisateurs
 @api.route('/liste_users', methods=['GET'])
 def getAll():
-    datas = User.filter_by(roles="client")
+    datas = User.query.filter_by(roles="client").all()
     return jsonify(
         [
         {
@@ -121,7 +121,8 @@ def getAll():
 # Nombre des utilisateurs
 @api.route('/count_User', methods=['GET'])
 def count_User():
-    count = User.query.count()
+    # count = User.query.count()
+    count = User.query.filter_by(roles="client").count()
     return jsonify({"count_User": count}), 200
 
 # Le nombre d'utilisateurs par rôle
