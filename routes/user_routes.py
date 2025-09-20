@@ -136,4 +136,3 @@ def count_roles():
         'manager': manager_count,
         'employes': employee_count,
     }), 200
-
