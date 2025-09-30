@@ -142,26 +142,30 @@ def paiement_liste():
         } for paiement in paiements
     ]), 200
 
-# @api.route("/payments_success/models_cv", methods=["GET"])
-# def get_success_models():
-#     try:
-#         # Récupérer uniquement les paiements validés
-#         paiements_success = Paiement.query.filter_by(status="SUCCESS").all()
+@api.route("/payments_success/<int:user_id>/models_cv", methods=["GET"])
+def get_success_models_by_user(user_id):
+    try:
+        # Récupérer uniquement les paiements validés de cet utilisateur
+        paiements_success = Paiement.query.filter_by(
+            status="SUCCESS",
+            users_id=user_id
+        ).all()
 
-#         # Extraire les models_cv_id uniques
-#         models_ids = list({paiement.models_cv_id for paiement in paiements_success})
+        # Extraire les models_cv_id uniques
+        models_ids = list({paiement.models_cv_id for paiement in paiements_success})
 
-#         return jsonify({
-#             "success": True,
-#             "count": len(models_ids),
-#             "models_cv_ids": models_ids
-#         }), 200
+        return jsonify({
+            "success": True,
+            "user_id": user_id,
+            "count": len(models_ids),
+            "models_cv_ids": models_ids
+        }), 200
 
-#     except Exception as e:
-#         return jsonify({
-#             "success": False,
-#             "message": f"Erreur lors de la récupération : {str(e)}"
-#         }), 500
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Erreur lors de la récupération : {str(e)}"
+        }), 500
 
 # # Route de notification
 # # Route de notification
