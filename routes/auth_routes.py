@@ -17,11 +17,8 @@ def login():
         if user and check_password(data['password'], user.password):
             token = create_access_token(
                 identity=user.id,
-                additional_claims={
-                    "roles": user.roles  # Assure-toi que user.role vaut 'admin' ou 'client'
-                }
-               
-                 )
+                additional_claims={"roles": user.roles }
+               )
             return jsonify({'access_token': token}), 200
         return jsonify({'message': "L'email ou le mot de passe n'existe pas"}), 401
     except Exception as e:

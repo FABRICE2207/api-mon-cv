@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import db, Paiements, Abonnements
+from models import db, Paiement
 import os
 import requests
 import uuid
@@ -19,21 +19,21 @@ CINETPAY_NOTIFY_URL = os.getenv("CINETPAY_NOTIFY_URL")
 CINETPAY_RETURN_URL = os.getenv("CINETPAY_RETURN_URL")
 
 # Route paiement
-@api.route("/paiements_initier", methods=["POST"])
+@api.route("/payments_init", methods=["POST"])
 def initier_paiement():
     data = request.get_json()
     montant = data.get("montant")
-    abonnement_id = data.get("abonnement_id")
-    restaurant_id = data.get("restaurant_id")
+    users_id = data.get("users_id")
+    models_cv_id = data.get("models_cv_id")
 
     # if not all([montant, abonnement_id, restaurant_id]):
     #     return jsonify({"error": "Données incomplètes"}), 400
 
-    abonnement = Abonnements.query.filter_by(id=abonnement_id, restaurant_id=restaurant_id).first()
-    if not abonnement:
-        return jsonify({"error": "Abonnement introuvable"}), 404
+    # abonnement = Abonnements.query.filter_by(id=abonnement_id, restaurant_id=restaurant_id).first()
+    # if not abonnement:
+    #     return jsonify({"error": "Abonnement introuvable"}), 404
 
-    transaction_id = f"PMT-ABN-{uuid.uuid4().hex[:20]}".upper()
+    transaction_id = f"PMT-CV-{uuid.uuid4().hex[:20]}".upper()
 
     url = "https://api-checkout.cinetpay.com/v2/payment"
     
@@ -42,17 +42,19 @@ def initier_paiement():
         "apikey": CINETPAY_APIKEY, # APIKEY de cinetpay
         "site_id": CINETPAY_SITE_ID, # ID du site de cinetpay
         "transaction_id": transaction_id,
-        "amount": montant,
+        "amount": montant,  # montant en chiffre entier
         "currency": "XOF",
-        "description":f"Paiement de l'abonnement {abonnement.type_abonnement} pour l'affichage de votre produit",
+        "description":"Paiement pour modèle CV",
         "notify_url": CINETPAY_NOTIFY_URL,  
         "return_url": CINETPAY_RETURN_URL,      
         "channels": "ALL",
-        "invoice_data":{
-            "Reste à payer":"25 000fr",
-            "Matricule":"24OPO25",
-            "Annee-scolaire":"2020-2021"
-        }
+        # "return_url": "http://localhost:3000/payment-success",
+        # "notify_url": "http://localhost:5000/api/paiements/payments/callback"
+        # "invoice_data":{
+        #     "Reste à payer":"25 000fr",
+        #     "Matricule":"24OPO25",
+        #     "Annee-scolaire":"2020-2021"
+        # }
     }
 
     headers = {
@@ -67,7 +69,7 @@ def initier_paiement():
 
         if result["code"] == '201' and result["data"]["payment_url"]:
             # Enregistrer le paiement en base
-            paiement = Paiements(
+            paiement = Paiement(
                 transaction_id=transaction_id,
                 amount=montant,
                 currency="XOF",
@@ -75,9 +77,9 @@ def initier_paiement():
                 # notify_url=payload["notify_url"],
                 # return_url=payload["return_url"],
                 channels="ALL",
-                status="En attente",
-                restaurant_id=restaurant_id,
-                abonnement_id=abonnement_id
+                statut="PENDING",
+                users_id=users_id,
+                models_cv_id=models_cv_id,
             )
 
             db.session.add(paiement)
@@ -93,11 +95,30 @@ def initier_paiement():
     except Exception as e:
         return jsonify({"error": "Erreur serveur", "message": str(e)}), 500
 
-# Liste des paiements
+# 👉 Callback CinetPay (notification serveur à serveur)
+# @api.route("/payments/callback", methods=["POST"])
+# def callback_paiement():
+#     data = request.json
+#     transaction_id = data.get("transaction_id")
+#     status = data.get("status")
+
+#     paiement = Paiement.query.filter_by(transaction_id=transaction_id).first()
+
+#     if not paiement:
+#         return jsonify({"error": "Transaction inconnue"}), 404
+
+#     # Mise à jour statut
+#     paiement.statut = "SUCCESS" if status == "ACCEPTED" else "FAILED"
+#     paiement.updated_at = datetime.utcnow()
+#     db.session.commit()
+
+#     return jsonify({"message": "Statut mis à jour", "statut": paiement.statut})
+
+# # Liste des paiements
 @api.route("/liste_paiement", methods=["GET"])
 def paiement_liste():
     # Afficher les paiements les plus récents en premiers
-    paiements = Paiements.query.order_by(Paiements.created_at.desc()).all()
+    paiements = Paiement.query.order_by(Paiement.created_at.desc()).all()
     return jsonify([
         {
             'transaction_id': paiement.transaction_id,
@@ -105,62 +126,63 @@ def paiement_liste():
             'currency': paiement.currency,
             'description': paiement.description,
             'channels': paiement.channels,
-            'status': paiement.status,
-            'restaurant': {
-                'id': paiement.restaurant_id,
-                'nom': paiement.restaurant.nom,
+            'statut': paiement.statut,
+            'users': {
+                'id': paiement.users_id,
+                'username': paiement.users.username,
             },
             'mode_paiement': paiement.mode_paiement,
-            'abonnements': {
-                'id': paiement.abonnement_id,
-                'type_abonnement': paiement.abonnements.type_abonnement
+            'models_cv': {
+                'id': paiement.models_cv_id,
+                'libelle': paiement.models_cv.libelle,
             },
             'created_at': paiement.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': paiement.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             'total': len(paiements), # format lisible
         } for paiement in paiements
     ]), 200
 
-# Route de notification
-# Route de notification
-@api.route("/confirmation_paiement", methods=["POST"])
-def confirmation_paiement():  # Correction du nom de la fonction (confimation -> confirmation)
-    data = request.form
-    transaction_id = data.get("transaction_id")
-    status = data.get("status")  # 'ACCEPTED', 'REFUSED', 'CANCELLED'
+# # Route de notification
+# # Route de notification
+# @api.route("/confirmation_paiement", methods=["POST"])
+# def confirmation_paiement():  # Correction du nom de la fonction (confimation -> confirmation)
+#     data = request.form
+#     transaction_id = data.get("transaction_id")
+#     status = data.get("status")  # 'ACCEPTED', 'REFUSED', 'CANCELLED'
 
-    # Validation des données reçues
-    if not transaction_id or not status:
-        return jsonify({"error": "Données de transaction incomplètes"}), 400
+#     # Validation des données reçues
+#     if not transaction_id or not status:
+#         return jsonify({"error": "Données de transaction incomplètes"}), 400
 
-    # Recherche du paiement dans la base de données
-    paiement = Paiements.query.filter_by(transaction_id=transaction_id).first()
-    if not paiement:
-        return jsonify({"error": "Paiement introuvable"}), 404
+#     # Recherche du paiement dans la base de données
+#     paiement = Paiements.query.filter_by(transaction_id=transaction_id).first()
+#     if not paiement:
+#         return jsonify({"error": "Paiement introuvable"}), 404
 
-    try:
-        # Mise à jour du statut du paiement
-        paiement.status = status
-        db.session.commit()
+#     try:
+#         # Mise à jour du statut du paiement
+#         paiement.status = status
+#         db.session.commit()
 
-        # Activation de l'abonnement si le paiement est accepté
-        if status == "ACCEPTED":
-            abonnement = Abonnements.query.get(paiement.abonnement_id)
-            if abonnement:
-                abonnement.statut = "Actif"
-                db.session.commit()
+#         # Activation de l'abonnement si le paiement est accepté
+#         if status == "ACCEPTED":
+#             abonnement = Abonnements.query.get(paiement.abonnement_id)
+#             if abonnement:
+#                 abonnement.statut = "Actif"
+#                 db.session.commit()
 
-        return jsonify({
-            "message": "Paiement confirmé !",
-            "transaction_id": transaction_id,
-            "status": status
-        }), 200
+#         return jsonify({
+#             "message": "Paiement confirmé !",
+#             "transaction_id": transaction_id,
+#             "status": status
+#         }), 200
 
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": f"Erreur lors du traitement: {str(e)}"}), 500
+#     except Exception as e:
+#         db.session.rollback()
+#         return jsonify({"error": f"Erreur lors du traitement: {str(e)}"}), 500
     
-@api.route("/notification_paiement", methods=["POST"])
-def notification_paiement():
+# @api.route("/notification_paiement", methods=["POST"])
+# def notification_paiement():
     # 1. Récupération et validation des données
     data = request.form
     required_fields = ['cpm_trans_id', 'cpm_site_id', 'cpm_amount', 'cpm_currency', 'signature', 'payment_method', 'cel_phone_num', 'cpm_result']

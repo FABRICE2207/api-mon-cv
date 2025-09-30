@@ -31,6 +31,7 @@ class User(db.Model):
     password = db.Column(db.String(255), nullable=False)
     roles = db.Column(db.String(8), default="client")
     cvs = db.relationship('Cv', backref='users', lazy=True)
+    paiements = db.relationship('Paiement', backref='users', lazy=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -50,8 +51,38 @@ class Model_cv(db.Model):
     images = db.Column(db.String(120), unique=True, nullable=False)
     statut = db.Column(db.String(10), nullable=False)
     cvs = db.relationship('Cv', backref='models_cv', lazy=True)
+    paiements = db.relationship('Paiement', backref='models_cv', lazy=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class Paiement(db.Model):
+    __tablename__ = 'paiements'
+    id = db.Column(db.Integer, primary_key=True)
+
+    # Lien vers l'utilisateur qui a fait le paiement
+    users_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+
+    # Lien vers le modèle de CV acheté
+    models_cv_id = db.Column(db.Integer, db.ForeignKey('models_cv.id'), nullable=False)
+    
+    # # Lien vers le CV payé
+    # cv_id = db.Column(db.Integer, db.ForeignKey('cvs.id'), nullable=False)
+    # cv = db.relationship('Cv', backref='paiements', lazy=True)
+
+    # Informations de paiement
+    # status = db.Column(db.String(20), nullable=False, default="En attente")
+    amount = db.Column(db.Integer, nullable=False)   # ex : 1000 FCFA
+    currency = db.Column(db.String(5), nullable=False)  # ex : "XOF"
+    description = db.Column(db.String(100), nullable=False)
+    transaction_id = db.Column(db.String(120), unique=True, nullable=True)  # ID retourné par CinetPay
+    statut = db.Column(db.String(20), default="PENDING")  # PENDING, SUCCESS, FAILED
+    channels = db.Column(db.String(15), nullable=False)
+    mode_paiement = db.Column(db.String(50), nullable=True)  # Orange Money, MTN, Wave...
+
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 
 # class Abonnements(db.Model):
 #     __tablename__ = 'abonnements'

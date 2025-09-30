@@ -15,7 +15,7 @@ from flask_jwt_extended import create_access_token
 api = Blueprint('user_api', __name__)
 
 # =====================
-# 🔐 Enregistrement utilisateur
+# Enregistrement utilisateur
 # =====================
 @api.route('/register', methods=['POST'])
 def register():
@@ -39,7 +39,7 @@ def register():
     return jsonify({'msg': "Utilisateur inscrit avec succès"}), 201
 
 # =====================
-# 🔐 Connexion utilisateur
+# Connexion utilisateur
 # =====================
 @api.route('/update', methods=['POST'])
 def update_user(id):

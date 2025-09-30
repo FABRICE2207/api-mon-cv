@@ -9,7 +9,7 @@ from flask_migrate import Migrate
 from routes.user_routes import api as user_api
 from routes.cv_routes import api as cvs_api
 from routes.model_cv_routes import api as model_cv_api
-# from routes.paiement_routes import api as paiements_api
+from routes.paiement_routes import api as paiements_api
 # from routes.type_conges_routes import api as type_conges_api
 from routes.tokens import tokens_bp as tokens
 from routes.auth_routes import auth_api
@@ -48,7 +48,7 @@ def create_app():
     # Enregistre le blueprint des routes d'authentification
     app.register_blueprint(auth_api, url_prefix='/api/login')
     # # Enregistre le blueprint des routes de paiement
-    # app.register_blueprint(paiements_api, url_prefix='/api/paiements')
+    app.register_blueprint(paiements_api, url_prefix='/api/paiements')
     
     return app
 
