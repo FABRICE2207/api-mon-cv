@@ -45,8 +45,8 @@ def initier_paiement():
         "amount": montant,  # montant en chiffre entier
         "currency": "XOF",
         "description":"Paiement pour modèle CV",
-        # "notify_url": CINETPAY_NOTIFY_URL,  
-        # "return_url": CINETPAY_RETURN_URL,      
+        "notify_url": CINETPAY_NOTIFY_URL,  
+        "return_url": CINETPAY_RETURN_URL,      
         "channels": "ALL",
         # "return_url": "http://localhost:3000/payment-success",
         # "notify_url": "http://localhost:5000/api/paiements/payments/callback"
@@ -95,25 +95,56 @@ def initier_paiement():
     except Exception as e:
         return jsonify({"error": "Erreur serveur", "message": str(e)}), 500
 
-# 👉 Callback CinetPay (notification serveur à serveur)
-# @api.route("/payments/callback", methods=["POST"])
-# def callback_paiement():
-#     data = request.json
-#     transaction_id = data.get("transaction_id")
-#     status = data.get("status")
+# Callback CinetPay (notification serveur à serveur)
+@api.route("/payments/callback", methods=["POST", "GET"])
+def callback_paiement():
+    data = request.json
+    transaction_id = data.get("cpm_trans_id")
+    status = data.get("status")
 
-#     paiement = Paiement.query.filter_by(transaction_id=transaction_id).first()
+    paiement = Paiement.query.filter_by(transaction_id=transaction_id).first()
+    paiement.status = "SUCCESS"
+    paiement.cpm_trans_date = data.get("cpm_trans_date")
+    paiement.cel_phone_num = data.get("cel_phone_num")
+    paiement.cpm_phone_prefixe = data.get("cpm_phone_prefixe")
+    paiement.cpm_error_message = data.get("cpm_error_message")
+    paiement.cpm_site_id = data.get("cpm_site_id")
 
-#     if not paiement:
-#         return jsonify({"error": "Transaction inconnue"}), 404
 
-#     # Mise à jour statut
-#     paiement.statut = "SUCCESS" if status == "ACCEPTED" else "FAILED"
-#     paiement.updated_at = datetime.utcnow()
-#     db.session.commit()
+    if not paiement:
+        return jsonify({"error": "Transaction inconnue"}), 404
 
-#     return jsonify({"message": "Statut mis à jour", "statut": paiement.statut})
+    # vérification transaction
+    url = "https://api-checkout.cinetpay.com/v2/payment/check"
+    
 
+    payload = {
+        "apikey": CINETPAY_APIKEY, # APIKEY de cinetpay
+        "site_id": CINETPAY_SITE_ID, # ID du site de cinetpay
+        "transaction_id": transaction_id,
+    }
+
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        result = response.json()
+        print("Vérification CinetPay:", result)
+        paiement.mode_paiement = data.get("payment_method")
+        if result["code"] == '00':
+            # Mise à jour statut
+            paiement.status = "SUCCESS" 
+            paiement.updated_at = datetime.utcnow()
+            db.session.commit()
+
+            return jsonify({"message": "Statut mis à jour", "statut": paiement.status}), 200
+
+    except Exception as e:
+        return jsonify({"error": "Erreur serveur lors de la vérification", "message": str(e)}), 500
+
+    
 # # Liste des paiements
 @api.route("/liste_paiement", methods=["GET"])
 def paiement_liste():
