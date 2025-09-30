@@ -45,8 +45,8 @@ def initier_paiement():
         "amount": montant,  # montant en chiffre entier
         "currency": "XOF",
         "description":"Paiement pour modèle CV",
-        "notify_url": CINETPAY_NOTIFY_URL,  
-        "return_url": CINETPAY_RETURN_URL,      
+        # "notify_url": CINETPAY_NOTIFY_URL,  
+        # "return_url": CINETPAY_RETURN_URL,      
         "channels": "ALL",
         # "return_url": "http://localhost:3000/payment-success",
         # "notify_url": "http://localhost:5000/api/paiements/payments/callback"
@@ -141,6 +141,27 @@ def paiement_liste():
             'total': len(paiements), # format lisible
         } for paiement in paiements
     ]), 200
+
+# @api.route("/payments_success/models_cv", methods=["GET"])
+# def get_success_models():
+#     try:
+#         # Récupérer uniquement les paiements validés
+#         paiements_success = Paiement.query.filter_by(status="SUCCESS").all()
+
+#         # Extraire les models_cv_id uniques
+#         models_ids = list({paiement.models_cv_id for paiement in paiements_success})
+
+#         return jsonify({
+#             "success": True,
+#             "count": len(models_ids),
+#             "models_cv_ids": models_ids
+#         }), 200
+
+#     except Exception as e:
+#         return jsonify({
+#             "success": False,
+#             "message": f"Erreur lors de la récupération : {str(e)}"
+#         }), 500
 
 # # Route de notification
 # # Route de notification
