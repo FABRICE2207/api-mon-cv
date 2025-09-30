@@ -98,6 +98,8 @@ def initier_paiement():
 # Callback CinetPay (notification serveur à serveur)
 @api.route("/payments/callback", methods=["POST", "GET"])
 def callback_paiement():
+    if request.method == "GET":
+        return "CinetPay Callback Endpoint", 200
     data = request.json
     transaction_id = data.get("cpm_trans_id")
     status = data.get("status")
