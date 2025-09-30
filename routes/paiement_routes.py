@@ -77,7 +77,7 @@ def initier_paiement():
                 # notify_url=payload["notify_url"],
                 # return_url=payload["return_url"],
                 channels="ALL",
-                statut="PENDING",
+                status="PENDING",
                 users_id=users_id,
                 models_cv_id=models_cv_id,
             )
@@ -126,7 +126,7 @@ def paiement_liste():
             'currency': paiement.currency,
             'description': paiement.description,
             'channels': paiement.channels,
-            'statut': paiement.statut,
+            'status': paiement.status,
             'users': {
                 'id': paiement.users_id,
                 'username': paiement.users.username,

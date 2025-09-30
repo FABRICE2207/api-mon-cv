@@ -75,7 +75,7 @@ class Paiement(db.Model):
     currency = db.Column(db.String(5), nullable=False)  # ex : "XOF"
     description = db.Column(db.String(100), nullable=False)
     transaction_id = db.Column(db.String(120), unique=True, nullable=True)  # ID retourné par CinetPay
-    statut = db.Column(db.String(20), default="PENDING")  # PENDING, SUCCESS, FAILED
+    status = db.Column(db.String(20), default="PENDING")  # PENDING, SUCCESS, FAILED
     channels = db.Column(db.String(15), nullable=False)
     mode_paiement = db.Column(db.String(50), nullable=True)  # Orange Money, MTN, Wave...
 
