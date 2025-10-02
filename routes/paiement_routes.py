@@ -4,6 +4,9 @@ import os
 import requests
 import uuid
 from datetime import datetime, timedelta
+from models.models import Cv
+from sqlalchemy import func
+
 api = Blueprint("paiements_api", __name__)
 
 # Clé API de paiement
@@ -190,11 +193,11 @@ def callback_paiement():
         if result.get("code") == "00":
             # Mise à jour statut
             paiement.status = "SUCCESS"
-            paiement.updated_at = datetime.utcnow()
+            # paiement.expire_at=datetime.utcnow() + timedelta(minutes=2) # 2min d'accès au modèle
+            paiement.expire_at = datetime.utcnow() + timedelta(hours=24) # 24h d'accès au modèle
         else:
             paiement.status = "FAILED"
 
-        paiement.updated_at = datetime.utcnow()
         db.session.commit()
 
         return jsonify({"message": "Statut mis à jour", "statut": paiement.status}), 200
@@ -226,28 +229,34 @@ def paiement_liste():
                 'libelle': paiement.models_cv.libelle,
             },
             'created_at': paiement.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'updated_at': paiement.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': paiement.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
             'total': len(paiements), # format lisible
         } for paiement in paiements
     ]), 200
 
+from datetime import datetime
+
 @api.route("/payments_success/<int:user_id>/models_cv", methods=["GET"])
 def get_success_models_by_user(user_id):
     try:
-        # Récupérer uniquement les paiements validés de cet utilisateur
-        paiements_success = Paiement.query.filter_by(
-            status="SUCCESS",
-            users_id=user_id
+        now = datetime.utcnow()
+
+        # Paiements SUCCESS non expirés
+        paiements_success = Paiement.query.filter(
+            Paiement.status == "SUCCESS",
+            Paiement.users_id == user_id,
+            Paiement.expire_at > now  # ⏳ expiration pas encore atteinte
         ).all()
 
-        # Extraire les models_cv_id uniques
+        # Extraire les IDs uniques
         models_ids = list({paiement.models_cv_id for paiement in paiements_success})
 
         return jsonify({
             "success": True,
             "user_id": user_id,
             "count": len(models_ids),
-            "models_cv_ids": models_ids
+            "models_cv_ids": models_ids,
+            "expire_dates": {p.models_cv_id: p.expire_at.isoformat() for p in paiements_success}
         }), 200
 
     except Exception as e:
@@ -256,108 +265,31 @@ def get_success_models_by_user(user_id):
             "message": f"Erreur lors de la récupération : {str(e)}"
         }), 500
 
-# # Route de notification
-# # Route de notification
-# @api.route("/confirmation_paiement", methods=["POST"])
-# def confirmation_paiement():  # Correction du nom de la fonction (confimation -> confirmation)
-#     data = request.form
-#     transaction_id = data.get("transaction_id")
-#     status = data.get("status")  # 'ACCEPTED', 'REFUSED', 'CANCELLED'
-
-#     # Validation des données reçues
-#     if not transaction_id or not status:
-#         return jsonify({"error": "Données de transaction incomplètes"}), 400
-
-#     # Recherche du paiement dans la base de données
-#     paiement = Paiements.query.filter_by(transaction_id=transaction_id).first()
-#     if not paiement:
-#         return jsonify({"error": "Paiement introuvable"}), 404
-
-#     try:
-#         # Mise à jour du statut du paiement
-#         paiement.status = status
-#         db.session.commit()
-
-#         # Activation de l'abonnement si le paiement est accepté
-#         if status == "ACCEPTED":
-#             abonnement = Abonnements.query.get(paiement.abonnement_id)
-#             if abonnement:
-#                 abonnement.statut = "Actif"
-#                 db.session.commit()
-
-#         return jsonify({
-#             "message": "Paiement confirmé !",
-#             "transaction_id": transaction_id,
-#             "status": status
-#         }), 200
-
-#     except Exception as e:
-#         db.session.rollback()
-#         return jsonify({"error": f"Erreur lors du traitement: {str(e)}"}), 500
-    
-# @api.route("/notification_paiement", methods=["POST"])
-# def notification_paiement():
-    # 1. Récupération et validation des données
-    data = request.form
-    required_fields = ['cpm_trans_id', 'cpm_site_id', 'cpm_amount', 'cpm_currency', 'signature', 'payment_method', 'cel_phone_num', 'cpm_result']
-    
-    if not all(field in data for field in required_fields):
-        return jsonify({"error": "Données de notification incomplètes"}), 400
-
-    # 2. Vérification de la signature
-    api_key = os.getenv("CINETPAY_API_KEY")  # À stocker dans les variables d'environnement
-    signature_data = f"{data['cpm_trans_id']}{data['cpm_site_id']}{data['cpm_amount']}{data['cpm_currency']}{api_key}"
-    generated_signature = hashlib.sha256(signature_data.encode()).hexdigest()
-    
-    if generated_signature != data['signature']:
-        return jsonify({"error": "Signature invalide"}), 403
-
-    # 3. Traitement du paiement
+# Montant total des paiements réussis
+@api.route("/dashboard/statistic", methods=["GET"])
+def dashboard_stats():
     try:
-        transaction_id = data['cpm_trans_id']
-        status = "ACCEPTED" if data['cpm_result'] == "00" else "REFUSED"
-        amount = int(data['cpm_amount'])
-        # phone = data['cel_phone_num']
-        method = data['payment_method']
-        
-        # Recherche du paiement
-        paiement = Paiements.query.filter_by(transaction_id=transaction_id).first()
-        
-        if not paiement:
-            return jsonify({"error": "Transaction introuvable"}), 404
-            
-        # Mise à jour du paiement
-        paiement.status = status
-        paiement.montant = amount
-        paiement.methode_paiement = method
-        # paiement.telephone = phone
-        paiement.updated_at = datetime.utcnow()
-        
-        db.session.commit()
+        # Total montant en caisse (paiements réussis)
+        total_montant = db.session.query(func.sum(Paiement.amount)).filter(Paiement.status == "SUCCESS").scalar() or 0
 
-        # Si paiement accepté, activer l'abonnement
-        if status == "ACCEPTED":
-            abonnement = Abonnements.query.get(paiement.abonnement_id)
-            if abonnement:
-                abonnement.statut = "Actif"
-                abonnement.date_debut = datetime.utcnow()
-                abonnement.date_fin = datetime.utcnow() + timedelta(days=30)  # Exemple: 1 mois
-                db.session.commit()
+        # Nombre de Cv dont le paiement est pending
+        nb_cv_pending = db.session.query(Paiement).filter(Paiement.status == "PENDING").count()
 
-                # Ici vous pourriez ajouter un email de confirmation
-                # ou une notification SMS
+        # Nombre de CV téléchargés (paiements réussis)
+        nb_cv_telecharges = db.session.query(Paiement).filter(Paiement.status == "SUCCESS").count()
 
-        # Réponse obligatoire pour CinetPay
+        # Nombre de CV créés (modèles ou CVs selon ton modèle Cv)
+        nb_cv_crees = db.session.query(Cv).count()
+
         return jsonify({
-            "status": "success",
-            "message": "Notification traitée avec succès",
-            "transaction_id": transaction_id,
-            "code": data['cpm_result']
+            "success": True,
+            "total_montant": total_montant,
+            "nb_cv_pending": nb_cv_pending,
+            "nb_cv_telecharges": nb_cv_telecharges,
+            "nb_cv_crees": nb_cv_crees
         }), 200
-
     except Exception as e:
-        db.session.rollback()
         return jsonify({
-            "error": "Erreur de traitement",
-            "details": str(e)
+            "success": False,
+            "message": f"Erreur lors du calcul des stats : {str(e)}"
         }), 500
